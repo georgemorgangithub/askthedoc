@@ -9,7 +9,7 @@ from langchain_community.llms import OpenAI
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
-from langchain.chains import create_retrieval_chain
+from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
 def generate_response(uploaded_file, openai_api_key, query_text):
@@ -44,14 +44,17 @@ def generate_response(uploaded_file, openai_api_key, query_text):
         Question: {question}
         Answer: """
         prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-        # Create retrieval chain
-        qa_chain = create_retrieval_chain(
+        # Create QA chain
+        qa_chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
             retriever=retriever,
-            combine_docs_chain_kwargs={"prompt": prompt, "llm": llm}
+            return_source_documents=False,
+            chain_type_kwargs={"prompt": prompt}
         )
         # Run query
-        response = qa_chain.invoke({"question": query_text})
-        return response["answer"]
+        response = qa_chain.invoke({"query": query_text})
+        return response["result"]
     except Exception as e:
         st.error(f"Error processing the request: {str(e)}")
         return None
