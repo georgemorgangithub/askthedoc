@@ -1,9 +1,10 @@
 import streamlit as st
-from langchain.llms import OpenAI
+from langchain_community.llms import OpenAI
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.chains import RetrievalQA
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain.chains import create_retrieval_chain
+from langchain.prompts import PromptTemplate
 
 def generate_response(uploaded_file, openai_api_key, query_text):
     # Load document if file is uploaded
@@ -16,11 +17,25 @@ def generate_response(uploaded_file, openai_api_key, query_text):
     embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
     # Create a vectorstore from documents
     db = Chroma.from_documents(texts, embeddings)
-    # Create retriever interface
+    # Create retriever
     retriever = db.as_retriever()
-    # Create QA chain
-    qa = RetrievalQA.from_chain_type(llm=OpenAI(openai_api_key=openai_api_key), chain_type='stuff', retriever=retriever)
-    return qa.run(query_text)
+    # Initialize LLM
+    llm = OpenAI(openai_api_key=openai_api_key)
+    # Define prompt template (mimicking 'stuff' chain type)
+    prompt_template = """Use the following pieces of context to answer the question at the end. 
+    If you don't know the answer, just say that you don't know, don't try to make up an answer.
+    {context}
+    Question: {question}
+    Answer: """
+    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+    # Create retrieval chain
+    qa_chain = create_retrieval_chain(
+        retriever=retriever,
+        combine_docs_chain_kwargs={"prompt": prompt, "llm": llm}
+    )
+    # Run query
+    response = qa_chain.invoke({"question": query_text})
+    return response["answer"]
 
 # Page title
 st.set_page_config(page_title='🦜🔗 Ask the Doc App')
@@ -29,7 +44,7 @@ st.title('🦜🔗 Ask the Doc App')
 # File upload
 uploaded_file = st.file_uploader('Upload an article', type='txt')
 # Query text
-query_text = st.text_input('Enter your question:', placeholder = 'Please provide a short summary.', disabled=not uploaded_file)
+query_text = st.text_input('Enter your question:', placeholder='Please provide a short summary.', disabled=not uploaded_file)
 
 # Form input and query
 result = []
