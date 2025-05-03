@@ -1,3 +1,8 @@
+# Override default sqlite3 with pysqlite3-binary
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import streamlit as st
 import os
 from langchain_community.llms import OpenAI
@@ -11,7 +16,6 @@ def generate_response(uploaded_file, openai_api_key, query_text):
     try:
         # Load document if file is uploaded
         if uploaded_file is not None:
-            # Decode file with error handling
             try:
                 documents = [uploaded_file.read().decode('utf-8')]
             except UnicodeDecodeError:
@@ -26,7 +30,7 @@ def generate_response(uploaded_file, openai_api_key, query_text):
         texts = text_splitter.create_documents(documents)
 
         # Select embeddings
-        embeddings = OpenAIEmbeddings(api_key=openai_api_key)  # Updated parameter name
+        embeddings = OpenAIEmbeddings(api_key=openai_api_key)
         # Create a vectorstore from documents
         db = Chroma.from_documents(texts, embeddings)
         # Create retriever
@@ -64,7 +68,7 @@ query_text = st.text_input('Enter your question:', placeholder='Please provide a
 # Form input and query
 result = []
 with st.form('myform', clear_on_submit=True):
-    openai_api_key = st.text_input('OpenAI API Key', type='password', disabled=not (uploaded_file and query_text))
+    openai_api_key = os.getenv("OPENAI_API_KEY") or st.text_input('OpenAI API Key', type='password', disabled=not (uploaded_file and query_text))
     submitted = st.form_submit_button('Submit', disabled=not(uploaded_file and query_text))
     if submitted and openai_api_key.startswith('sk-'):
         with st.spinner('Calculating...'):
